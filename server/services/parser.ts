@@ -1,5 +1,7 @@
 import * as fs from "fs";
 import * as path from "path";
+import * as pdfParse from "pdf-parse";
+import * as mammoth from "mammoth";
 
 export interface ParsedFile {
   text: string;
@@ -15,15 +17,16 @@ export async function parseFile(buffer: Buffer, filename: string, mimetype: stri
   
   try {
     if (mimetype === "application/pdf") {
-      // For PDF parsing, we'll use a simple text extraction
-      // In a real implementation, you'd use a library like pdf-parse
-      text = buffer.toString("utf-8");
+      // Parse PDF using pdf-parse library
+      const pdfData = await pdfParse(buffer);
+      text = pdfData.text;
     } else if (
       mimetype === "application/msword" ||
       mimetype === "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
     ) {
-      // For DOC/DOCX parsing, you'd use a library like mammoth
-      text = buffer.toString("utf-8");
+      // Parse DOCX using mammoth library
+      const result = await mammoth.extractRawText({ buffer });
+      text = result.value;
     } else if (mimetype === "text/plain") {
       text = buffer.toString("utf-8");
     } else {
@@ -39,7 +42,7 @@ export async function parseFile(buffer: Buffer, filename: string, mimetype: stri
       },
     };
   } catch (error) {
-    throw new Error(`Failed to parse file: ${error.message}`);
+    throw new Error(`Failed to parse file: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
 }
 

@@ -91,26 +91,45 @@ export default function LLMConfig({ onNext, onBack }: LLMConfigProps) {
     }
   };
 
+  const getDefaultValues = () => {
+    const base = { provider: selectedProvider };
+    switch (selectedProvider) {
+      case "openai":
+        return { ...base, apiKey: "", model: "gpt-4o", organizationId: "", deploymentName: "" };
+      case "claude":
+        return { ...base, apiKey: "", model: "claude-sonnet-4-20250514" };
+      case "gemini":
+        return { ...base, apiKey: "", model: "gemini-2.5-flash" };
+      case "ollama":
+        return { ...base, url: "http://localhost:11434", model: "llama2" };
+      default:
+        return { ...base, apiKey: "", model: "gpt-4o" };
+    }
+  };
+
   const form = useForm({
     resolver: zodResolver(getSchema()),
-    defaultValues: {
-      provider: selectedProvider,
-      ...(selectedProvider === "openai" && { model: "gpt-4o" }),
-      ...(selectedProvider === "claude" && { model: "claude-sonnet-4-20250514" }),
-      ...(selectedProvider === "gemini" && { model: "gemini-2.5-flash" }),
-      ...(selectedProvider === "ollama" && { url: "http://localhost:11434", model: "llama2" }),
-    },
+    defaultValues: getDefaultValues(),
   });
 
   const handleProviderChange = (provider: LLMProvider) => {
     setSelectedProvider(provider);
-    form.reset({
-      provider,
-      ...(provider === "openai" && { model: "gpt-4o" }),
-      ...(provider === "claude" && { model: "claude-sonnet-4-20250514" }),
-      ...(provider === "gemini" && { model: "gemini-2.5-flash" }),
-      ...(provider === "ollama" && { url: "http://localhost:11434", model: "llama2" }),
-    });
+    const defaultValues = (() => {
+      const base = { provider };
+      switch (provider) {
+        case "openai":
+          return { ...base, apiKey: "", model: "gpt-4o", organizationId: "", deploymentName: "" };
+        case "claude":
+          return { ...base, apiKey: "", model: "claude-sonnet-4-20250514" };
+        case "gemini":
+          return { ...base, apiKey: "", model: "gemini-2.5-flash" };
+        case "ollama":
+          return { ...base, url: "http://localhost:11434", model: "llama2" };
+        default:
+          return { ...base, apiKey: "", model: "gpt-4o" };
+      }
+    })();
+    form.reset(defaultValues);
   };
 
   const onSubmit = async (data: any) => {
