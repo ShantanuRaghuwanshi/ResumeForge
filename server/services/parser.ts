@@ -1,13 +1,61 @@
 import * as fs from "fs";
 import * as path from "path";
 import mammoth from "mammoth";
+import { exec } from "child_process";
+import { promisify } from "util";
 
-// Import pdf-parse with error handling
-let pdfParse: any = null;
-try {
-  pdfParse = require("pdf-parse");
-} catch (error) {
-  console.warn("PDF parsing library not available:", error.message);
+const execAsync = promisify(exec);
+
+// Since pdf-parse has ES module import issues, we'll use a subprocess approach
+async function parsePdfWithSubprocess(buffer: Buffer): Promise<string> {
+  return new Promise((resolve, reject) => {
+    // Write buffer to temporary file
+    const tempPath = `/tmp/temp_pdf_${Date.now()}.pdf`;
+    fs.writeFileSync(tempPath, buffer);
+    
+    // Use Node.js subprocess to call pdf-parse
+    const nodeScript = `
+      const fs = require('fs');
+      const pdfParse = require('pdf-parse');
+      
+      async function extractText() {
+        try {
+          const buffer = fs.readFileSync('${tempPath}');
+          const data = await pdfParse(buffer);
+          console.log(JSON.stringify({ success: true, text: data.text }));
+        } catch (error) {
+          console.log(JSON.stringify({ success: false, error: error.message }));
+        }
+      }
+      
+      extractText();
+    `;
+    
+    exec(`node -e "${nodeScript}"`, (error, stdout, stderr) => {
+      // Clean up temp file
+      try {
+        fs.unlinkSync(tempPath);
+      } catch (e) {
+        // Ignore cleanup errors
+      }
+      
+      if (error) {
+        reject(new Error(`PDF parsing failed: ${error.message}`));
+        return;
+      }
+      
+      try {
+        const result = JSON.parse(stdout.trim());
+        if (result.success) {
+          resolve(result.text);
+        } else {
+          reject(new Error(result.error));
+        }
+      } catch (parseError) {
+        reject(new Error(`Failed to parse PDF extraction result: ${parseError}`));
+      }
+    });
+  });
 }
 
 export interface ParsedFile {
@@ -24,23 +72,12 @@ export async function parseFile(buffer: Buffer, filename: string, mimetype: stri
   
   try {
     if (mimetype === "application/pdf") {
-      // Parse PDF using pdf-parse library
+      // Parse PDF using subprocess approach to avoid ES module import issues
       console.log(`[PDF PARSER] Processing PDF file: ${filename}, size: ${buffer.length} bytes`);
       
-      if (!pdfParse) {
-        throw new Error("PDF parsing library is not available. Please ensure pdf-parse is properly installed.");
-      }
-      
       try {
-        // Create a clean buffer copy to avoid any corruption issues
-        const cleanBuffer = Buffer.from(buffer);
-        const pdfData = await pdfParse(cleanBuffer, {
-          // Options to improve parsing
-          max: 0, // Parse all pages
-          version: 'default'
-        });
-        
-        text = pdfData.text || "";
+        console.log(`[PDF PARSER] Calling subprocess PDF parser...`);
+        text = await parsePdfWithSubprocess(buffer);
         console.log(`[PDF PARSER] Successfully extracted ${text.length} characters from PDF`);
         
         if (text.length > 0) {
