@@ -105,6 +105,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Parse the file
       const parsedFile = await parseFile(buffer, originalname, mimetype);
+      console.log(`[RESUME UPLOAD] File parsed successfully:`, {
+        filename: originalname,
+        size: parsedFile.metadata.size,
+        textLength: parsedFile.text.length,
+        textPreview: parsedFile.text.substring(0, 200) + "..."
+      });
       
       // Get active LLM config
       const userId = 1; // Mock user ID
@@ -116,9 +122,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
+      console.log(`[RESUME UPLOAD] Using LLM config:`, {
+        provider: llmConfig.provider,
+        configKeys: Object.keys(llmConfig.config as any)
+      });
+
       // Parse resume with LLM
       const llmService = createLLMService(llmConfig);
+      console.log(`[RESUME UPLOAD] Calling LLM to parse resume text...`);
       const parsedData = await llmService.parseResume(parsedFile.text);
+      console.log(`[RESUME UPLOAD] LLM parsing completed:`, {
+        hasPersonalDetails: !!parsedData.personalDetails,
+        experienceCount: parsedData.experience?.length || 0,
+        educationCount: parsedData.education?.length || 0,
+        hasSkills: !!parsedData.skills,
+        parsedDataPreview: JSON.stringify(parsedData, null, 2).substring(0, 500) + "..."
+      });
 
       // Create resume record
       const resume = await storage.createResume({
@@ -165,10 +184,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
+      console.log(`[RESUME ANALYSIS] Starting analysis for resume ${resumeId}`);
+      console.log(`[RESUME ANALYSIS] Resume data preview:`, {
+        hasPersonalDetails: !!(resume.parsedData as any)?.personalDetails,
+        experienceCount: (resume.parsedData as any)?.experience?.length || 0,
+        educationCount: (resume.parsedData as any)?.education?.length || 0,
+        dataPreview: JSON.stringify(resume.parsedData, null, 2).substring(0, 300) + "..."
+      });
+
       // Analyze resume
       const llmService = createLLMService(llmConfig);
       const analyzer = new ResumeAnalyzer(llmService);
+      console.log(`[RESUME ANALYSIS] Calling LLM analyzer...`);
       const analysisResults = await analyzer.analyzeResume(resume.parsedData);
+      console.log(`[RESUME ANALYSIS] Analysis completed:`, {
+        score: analysisResults.score,
+        suggestionsCount: analysisResults.suggestions?.length || 0,
+        hasKeywords: !!analysisResults.keywords,
+        atsCompatibility: analysisResults.atsCompatibility,
+        analysisPreview: JSON.stringify(analysisResults, null, 2).substring(0, 300) + "..."
+      });
 
       // Update resume with analysis
       const updatedResume = await storage.updateResume(resumeId, {

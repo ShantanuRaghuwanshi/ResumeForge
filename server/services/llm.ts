@@ -27,6 +27,9 @@ export class OpenAIService implements LLMService {
   }
 
   async parseResume(text: string): Promise<ParsedResume> {
+    console.log(`[OPENAI] Parsing resume with text length: ${text.length}`);
+    console.log(`[OPENAI] Text preview:`, text.substring(0, 200) + "...");
+    
     const response = await this.client.chat.completions.create({
       model: DEFAULT_OPENAI_MODEL,
       messages: [
@@ -39,7 +42,7 @@ export class OpenAIService implements LLMService {
           - skills: {technical, soft, languages}
           - projects: [{name, description, technologies}]
           
-          Return only valid JSON without any additional text.`
+          Return only valid JSON without any additional text. Make sure all fields are properly extracted from the resume content.`
         },
         {
           role: "user",
@@ -49,7 +52,11 @@ export class OpenAIService implements LLMService {
       response_format: { type: "json_object" },
     });
 
-    const result = JSON.parse(response.choices[0].message.content || "{}");
+    const rawResponse = response.choices[0].message.content || "{}";
+    console.log(`[OPENAI] Raw response:`, rawResponse);
+    
+    const result = JSON.parse(rawResponse);
+    console.log(`[OPENAI] Parsed result:`, JSON.stringify(result, null, 2));
     return result;
   }
 
@@ -117,6 +124,9 @@ export class ClaudeService implements LLMService {
   }
 
   async parseResume(text: string): Promise<ParsedResume> {
+    console.log(`[CLAUDE] Parsing resume with text length: ${text.length}`);
+    console.log(`[CLAUDE] Text preview:`, text.substring(0, 200) + "...");
+    
     const response = await this.client.messages.create({
       model: DEFAULT_CLAUDE_MODEL,
       max_tokens: 2048,
@@ -127,7 +137,7 @@ export class ClaudeService implements LLMService {
       - skills: {technical, soft, languages}
       - projects: [{name, description, technologies}]
       
-      Return only valid JSON without any additional text.`,
+      Return only valid JSON without any additional text. Make sure all fields are properly extracted from the resume content.`,
       messages: [
         {
           role: "user",
@@ -136,7 +146,11 @@ export class ClaudeService implements LLMService {
       ],
     });
 
-    const result = JSON.parse(response.content[0].text);
+    const rawResponse = response.content[0].text;
+    console.log(`[CLAUDE] Raw response:`, rawResponse);
+    
+    const result = JSON.parse(rawResponse);
+    console.log(`[CLAUDE] Parsed result:`, JSON.stringify(result, null, 2));
     return result;
   }
 
@@ -195,6 +209,9 @@ export class GeminiService implements LLMService {
   }
 
   async parseResume(text: string): Promise<ParsedResume> {
+    console.log(`[GEMINI] Parsing resume with text length: ${text.length}`);
+    console.log(`[GEMINI] Text preview:`, text.substring(0, 200) + "...");
+    
     const response = await this.client.models.generateContent({
       model: DEFAULT_GEMINI_MODEL,
       config: {
@@ -203,13 +220,19 @@ export class GeminiService implements LLMService {
         - experience: [{title, company, duration, description, achievements}]
         - education: [{degree, institution, year, gpa}]
         - skills: {technical, soft, languages}
-        - projects: [{name, description, technologies}]`,
+        - projects: [{name, description, technologies}]
+        
+        Return only valid JSON without any additional text. Make sure all fields are properly extracted from the resume content.`,
         responseMimeType: "application/json",
       },
       contents: `Parse this resume:\n\n${text}`,
     });
 
-    const result = JSON.parse(response.text || "{}");
+    const rawResponse = response.text || "{}";
+    console.log(`[GEMINI] Raw response:`, rawResponse);
+    
+    const result = JSON.parse(rawResponse);
+    console.log(`[GEMINI] Parsed result:`, JSON.stringify(result, null, 2));
     return result;
   }
 
